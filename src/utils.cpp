@@ -114,12 +114,39 @@ std::array<uint8_t,32> sha256(const std::string& s){ return sha256(std::vector<u
 std::string sha256_hex(const std::string& s){ auto h=sha256(s); std::ostringstream oss; for(auto b:h) oss<<std::hex<<std::setw(2)<<std::setfill('0')<<(int)b; return oss.str(); }
 std::string sha256_hex(const std::vector<uint8_t>& data){ auto h=sha256(data); std::ostringstream oss; for(auto b:h) oss<<std::hex<<std::setw(2)<<std::setfill('0')<<(int)b; return oss.str(); }
 
-std::string compute_data_cid(const std::vector<uint8_t>& data){
-    return "sha256:" + sha256_hex(data);
+static std::string cidv1_raw_sha256(const std::vector<uint8_t>& data){
+    static const char* alphabet = "abcdefghijklmnopqrstuvwxyz234567";
+    std::vector<uint8_t> bytes = {0x01, 0x55, 0x12, 0x20};
+    auto hash = sha256(data);
+    bytes.insert(bytes.end(), hash.begin(), hash.end());
+
+    std::string out = "b";
+    uint32_t buffer = 0;
+    int bits = 0;
+    for(uint8_t byte : bytes){
+        buffer = (buffer << 8) | byte;
+        bits += 8;
+        while(bits >= 5){
+            bits -= 5;
+            out.push_back(alphabet[(buffer >> bits) & 31]);
+        }
+    }
+    if(bits > 0) out.push_back(alphabet[(buffer << (5-bits)) & 31]);
+    return out;
 }
+
+std::string compute_data_cid(const std::vector<uint8_t>& data){
+    return cidv1_raw_sha256(data);
+}
+
 bool verify_data_cid(const std::vector<uint8_t>& data, const std::string& cid){
-    if(cid.rfind("sha256:",0)==0) return cid.substr(7)==sha256_hex(data);
-    return cid==sha256_hex(data);
+    if(cid == cidv1_raw_sha256(data)) return true;
+
+    // Keep compatibility with existing stored MVP records.
+    if(cid.rfind("sha256:",0)==0)
+        return cid.substr(7) == sha256_hex(data);
+
+    return cid == sha256_hex(data);
 }
 
 std::string now_iso8601(){
