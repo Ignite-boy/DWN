@@ -2,6 +2,8 @@
 #include "dwn/postgres_storage.hpp"
 #include "dwn/utils.hpp"
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 namespace dwn {
 
@@ -9,6 +11,21 @@ PostgresStorage::PostgresStorage(const std::string& conn_str)
     : conn_str_(conn_str) {
     try {
         conn_ = std::make_unique<pqxx::connection>(conn_str_);
+
+        // Initialize the persistent DWN schema on every startup.
+        {
+            std::ifstream file("/migrations/001_initial_1.sql");
+            if(!file.is_open()){
+                throw std::runtime_error("DWN migration file not found: /migrations/001_initial_1.sql");
+            }
+
+            std::stringstream buffer;
+            buffer << file.rdbuf();
+
+            pqxx::work w(*conn_);
+            w.exec(buffer.str());
+            w.commit();
+        }
 
         // Persistent JSON snapshots used by Milan's existing REST
         // compatibility layer. Safe to run repeatedly.
