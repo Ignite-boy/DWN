@@ -45,27 +45,48 @@ MessageDescriptor descriptor_from_json(const nlohmann::json& j){
 
 Authorization auth_from_json(const nlohmann::json& j){
     Authorization a;
-    a.payload = j.value("payload","");
-    if(j.contains("signatures")){
-        for(auto& s: j["signatures"]){
+
+    // Web5/DWN SDK uses:
+    // authorization.signature.payload
+    // authorization.signature.signatures[]
+    //
+    // Keep compatibility with the legacy flat authorization shape.
+
+    const nlohmann::json* src = &j;
+
+    if(j.contains("signature") && j["signature"].is_object()){
+        src = &j["signature"];
+    }
+
+    a.payload = src->value("payload", "");
+
+    if(src->contains("signatures") && (*src)["signatures"].is_array()){
+        for(auto& s: (*src)["signatures"]){
             Signature sig;
-            sig.protectedHeader = s.value("protected","");
-            sig.signature = s.value("signature","");
-            sig.kid = s.value("kid","");
+            sig.protectedHeader = s.value("protected", "");
+            sig.signature = s.value("signature", "");
+            sig.kid = s.value("kid", "");
+
             if(sig.kid.empty() && s.contains("protected")){
                 try {
-                    auto dec = utils::base64url_decode(s["protected"].get<std::string>());
+                    auto dec = utils::base64url_decode(
+                        s["protected"].get<std::string>()
+                    );
                     std::string prot(dec.begin(), dec.end());
                     auto pj = nlohmann::json::parse(prot);
-                    if(pj.contains("kid")) sig.kid = pj["kid"].get<std::string>();
+
+                    if(pj.contains("kid")){
+                        sig.kid = pj["kid"].get<std::string>();
+                    }
                 } catch(...) {}
             }
+
             a.signatures.push_back(sig);
         }
     }
+
     return a;
 }
-
 nlohmann::json auth_to_json(const Authorization& a){
     nlohmann::json j;
     j["payload"] = a.payload;
