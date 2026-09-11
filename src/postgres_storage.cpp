@@ -34,7 +34,6 @@ PostgresStorage::~PostgresStorage() {
 }
 
 pqxx::connection& PostgresStorage::get_conn(){
-    std::lock_guard<std::mutex> lock(mu_);
     if(!conn_ || !conn_->is_open()){
         conn_ = std::make_unique<pqxx::connection>(conn_str_);
     }
@@ -43,6 +42,7 @@ pqxx::connection& PostgresStorage::get_conn(){
 
 bool PostgresStorage::health_check(){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         w.exec("SELECT 1");
@@ -53,6 +53,7 @@ bool PostgresStorage::health_check(){
 
 bool PostgresStorage::ensure_tenant(const std::string& targetDid){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         w.exec_params("INSERT INTO dwn_tenants (did, created_at) VALUES ($1, NOW()) ON CONFLICT (did) DO NOTHING", targetDid);
@@ -68,6 +69,7 @@ bool PostgresStorage::put_database_snapshot(const std::string& name,
                                               const nlohmann::json& data,
                                               const std::string& pushedAt){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
 
@@ -96,6 +98,7 @@ std::optional<nlohmann::json> PostgresStorage::get_database_snapshot(
     const std::string& name,
     std::string* pushedAt){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
 
@@ -131,6 +134,7 @@ std::optional<nlohmann::json> PostgresStorage::get_database_snapshot(
 
 bool PostgresStorage::write_record(const Record& record){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         // Upsert record metadata
@@ -186,6 +190,7 @@ bool PostgresStorage::write_record(const Record& record){
 
 std::optional<Record> PostgresStorage::read_record(const std::string& targetDid, const std::string& recordId){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         auto r = w.exec_params(
@@ -228,6 +233,7 @@ std::optional<Record> PostgresStorage::read_record(const std::string& targetDid,
 std::vector<Record> PostgresStorage::query_records(const std::string& targetDid, const RecordsFilter& filter){
     std::vector<Record> out;
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         std::string sql = "SELECT record_id, target_did, owner_did, schema, data_format, protocol, protocol_path, recipient, published, date_created, date_modified, deleted, metadata, data_cid, data_size FROM dwn_records WHERE target_did=$1 AND deleted=false";
@@ -293,6 +299,7 @@ std::vector<Record> PostgresStorage::query_records(const std::string& targetDid,
 
 bool PostgresStorage::delete_record(const std::string& targetDid, const std::string& recordId, bool tombstone){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         if(tombstone){
@@ -311,6 +318,7 @@ bool PostgresStorage::delete_record(const std::string& targetDid, const std::str
 
 std::string PostgresStorage::append_event(const std::string& targetDid, const std::string& recordId, const std::string& eventType, const nlohmann::json& metadata){
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         auto r = w.exec_params("INSERT INTO dwn_events (target_did, record_id, event_type, metadata) VALUES ($1,$2,$3,$4) RETURNING event_id", targetDid, recordId, eventType, metadata.dump());
@@ -326,6 +334,7 @@ std::string PostgresStorage::append_event(const std::string& targetDid, const st
 std::vector<nlohmann::json> PostgresStorage::get_events(const std::string& targetDid, int limit){
     std::vector<nlohmann::json> out;
     try {
+        std::lock_guard<std::mutex> lock(mu_);
         auto& c = get_conn();
         pqxx::work w(c);
         auto r = w.exec_params("SELECT event_id, target_did, record_id, event_type, timestamp, metadata FROM dwn_events WHERE target_did=$1 ORDER BY timestamp DESC LIMIT $2", targetDid, limit);

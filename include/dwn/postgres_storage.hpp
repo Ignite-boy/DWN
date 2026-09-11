@@ -32,7 +32,7 @@ public:
 private:
     std::string conn_str_;
     std::unique_ptr<pqxx::connection> conn_;
-    std::mutex mu_; // pqxx connection is not thread-safe, guard with mutex for MVP (later use pool)
+    std::mutex mu_; // protects shared pqxx connection and transaction lifetime
 
     pqxx::connection& get_conn();
     void ensure_schema(); // runs migration if needed (for local dev)
