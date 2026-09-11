@@ -107,6 +107,11 @@ Message message_from_json(const nlohmann::json& j, const std::string& targetDid,
     m.raw = j;
     if(j.contains("recordId")) m.recordId = j["recordId"].get<std::string>();
     else if(j.contains("descriptor") && j["descriptor"].contains("recordId")) m.recordId = j["descriptor"]["recordId"].get<std::string>();
+    else if(j.contains("descriptor") &&
+            j["descriptor"].contains("filter") &&
+            j["descriptor"]["filter"].is_object() &&
+            j["descriptor"]["filter"].contains("recordId"))
+        m.recordId = j["descriptor"]["filter"]["recordId"].get<std::string>();
     else m.recordId = "";
 
     if(j.contains("descriptor")) m.descriptor = descriptor_from_json(j["descriptor"]);
