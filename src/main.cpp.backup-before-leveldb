@@ -1,6 +1,6 @@
 
 #include "dwn/config.hpp"
-#include "dwn/leveldb_storage.hpp"
+#include "dwn/postgres_storage.hpp"
 #include "dwn/auth.hpp"
 #include "dwn/server.hpp"
 #include <iostream>
@@ -14,9 +14,9 @@ int main(int argc, char** argv){
         auto cfg = dwn::Config::from_env();
         cfg.validate();
         std::cout << "Starting " << cfg.server_name << " v" << cfg.version << "\n";
-        std::cout << "LevelDB: " << cfg.leveldb_path << "\n";
+        std::cout << "Postgres: " << cfg.postgres_conn_str.substr(0, cfg.postgres_conn_str.find('@')!=std::string::npos ? cfg.postgres_conn_str.find('@') : 20) << "...\n";
 
-        dwn::LevelDbStorage storage(cfg.leveldb_path);
+        dwn::PostgresStorage storage(cfg.postgres_conn_str);
         if(!storage.health_check()){
             std::cerr << "Database health check failed\n";
             return 1;

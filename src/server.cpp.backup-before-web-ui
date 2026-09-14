@@ -2,76 +2,15 @@
 #include "dwn/server.hpp"
 #include "dwn/errors.hpp"
 #include "dwn/utils.hpp"
-#include "dwn/leveldb_storage.hpp"
+#include "dwn/postgres_storage.hpp"
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/strand.hpp>
 #include <iostream>
 #include <chrono>
-#include <fstream>
-#include <filesystem>
 
 namespace dwn {
-
-namespace {
-std::string dwn_ui_root(){
-    const char* env = std::getenv("DWN_UI_ROOT");
-    return env && *env ? std::string(env) : "/var/www/dwn-ui";
-}
-
-std::string ui_mime(const std::string& file){
-    auto ext = std::filesystem::path(file).extension().string();
-    if(ext == ".html") return "text/html; charset=utf-8";
-    if(ext == ".css") return "text/css; charset=utf-8";
-    if(ext == ".js") return "application/javascript; charset=utf-8";
-    if(ext == ".json") return "application/json; charset=utf-8";
-    if(ext == ".svg") return "image/svg+xml";
-    if(ext == ".png") return "image/png";
-    if(ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
-    if(ext == ".ico") return "image/x-icon";
-    return "application/octet-stream";
-}
-
-bool serve_dwn_ui(const std::string& target,
-                  const boost::beast::http::request<boost::beast::http::string_body>& req,
-                  boost::beast::http::response<boost::beast::http::string_body>& res){
-    namespace fs = std::filesystem;
-    namespace http = boost::beast::http;
-
-    if(req.method() != http::verb::get && req.method() != http::verb::head) return false;
-
-    std::string path = target;
-    auto q = path.find('?');
-    if(q != std::string::npos) path.resize(q);
-
-    std::string rel;
-    if(path == "/" || path == "/index.html") rel = "index.html";
-    else if(path == "/records") rel = "records.html";
-    else if(path == "/media") rel = "media.html";
-    else if(path == "/health-ui") rel = "health.html";
-    else if(path == "/developer") rel = "developer.html";
-    else if(path.rfind("/ui/", 0) == 0) rel = path.substr(4);
-    else return false;
-
-    if(rel.empty() || rel.find("..") != std::string::npos || rel.front() == '/') return false;
-
-    fs::path file = fs::path(dwn_ui_root()) / rel;
-    if(!fs::exists(file) || !fs::is_regular_file(file)) return false;
-
-    std::ifstream in(file, std::ios::binary);
-    if(!in) return false;
-
-    std::string body((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-
-    res.result(http::status::ok);
-    res.set(http::field::content_type, ui_mime(file.string()));
-    res.set(http::field::cache_control, "no-store");
-    if(req.method() == http::verb::get) res.body() = std::move(body);
-    res.prepare_payload();
-    return true;
-}
-}
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace websocket = beast::websocket;
@@ -111,8 +50,8 @@ void DwnServer::handle_database_snapshot(
     http::response<http::string_body>& res,
     const std::string& name){
 
-    auto* db = dynamic_cast<LevelDbStorage*>(&storage_);
-    if(!db){
+    auto* pg = dynamic_cast<PostgresStorage*>(&storage_);
+    if(!pg){
         res.result(http::status::not_implemented);
         res.set(http::field::content_type, "application/json");
         res.body() = R"({"ok":false,"error":"Postgres snapshot backend unavailable"})";
@@ -130,7 +69,7 @@ void DwnServer::handle_database_snapshot(
             std::string pushedAt =
                 body.value("pushedAt", std::string());
 
-            if(!db->put_database_snapshot(name, data, pushedAt)){
+            if(!pg->put_database_snapshot(name, data, pushedAt)){
                 res.result(http::status::internal_server_error);
                 res.set(http::field::content_type, "application/json");
                 res.body() = R"({"ok":false,"error":"snapshot write failed"})";
@@ -152,7 +91,7 @@ void DwnServer::handle_database_snapshot(
 
         if(req.method() == http::verb::get){
             std::string pushedAt;
-            auto data = db->get_database_snapshot(name, &pushedAt);
+            auto data = pg->get_database_snapshot(name, &pushedAt);
 
             if(!data){
                 res.result(http::status::not_found);
@@ -348,8 +287,6 @@ void DwnServer::handle_http(http::request<http::string_body>& req, http::respons
         }
         res.prepare_payload(); return;
     }
-    if(serve_dwn_ui(target, req, res)) return;
-
     // 404
     res.result(http::status::not_found);
     res.set(http::field::content_type,"application/json");

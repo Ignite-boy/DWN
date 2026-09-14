@@ -3,7 +3,7 @@ FROM ubuntu:24.04 AS builder
 RUN apt-get update && apt-get install -y \
     build-essential cmake pkg-config git \
     libboost-system-dev libboost-thread-dev \
-    libssl-dev libsodium-dev libpq-dev \
+    libssl-dev libsodium-dev libleveldb-dev \
     nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -32,17 +32,16 @@ FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y \
     libboost-system1.83.0 libboost-thread1.83.0 \
-    libssl3 libsodium23 libpq5 \
+    libssl3 libsodium23 libleveldb1d \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /opt/pqxx/lib/libpqxx-7.10.so /usr/local/lib/libpqxx-7.10.so
-RUN ln -sf /usr/local/lib/libpqxx-7.10.so /usr/local/lib/libpqxx.so
-COPY --from=builder /app/build/mini-dwn /usr/local/bin/mini-dwn
+COPY --from=builder /app/build/DWN /usr/local/bin/DWN
 COPY --from=builder /app/migrations /migrations
+COPY --from=builder /app/ui /var/www/dwn-ui
 
 RUN ldconfig /usr/local/lib
 
 EXPOSE 10000
 ENV DWN_HOST=0.0.0.0
 ENV DWN_PORT=10000
-CMD ["sh", "-c", "DWN_PORT=${PORT:-10000} mini-dwn"]
+CMD ["sh", "-c", "DWN_PORT=${PORT:-10000} DWN"]

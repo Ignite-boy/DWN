@@ -10,7 +10,7 @@ struct Config {
     uint16_t port = 3000;
     std::string log_level = "info";
 
-    std::string leveldb_path = "/var/lib/DWN/leveldb";
+    std::string postgres_conn_str = "postgresql://dwn:dwn_password@localhost:5432/mini_dwn";
 
     // TLS
     bool tls_enabled = false;

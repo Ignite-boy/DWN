@@ -14,7 +14,7 @@ Local:
 ```
 cmake -S . -B build
 cmake --build build
-./build/mini-dwn
+./build/DWN
 ```
 
 ## API

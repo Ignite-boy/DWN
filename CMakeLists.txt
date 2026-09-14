@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(mini-dwn VERSION 0.1.0 LANGUAGES CXX)
+project(DWN VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,7 +13,6 @@ option(ENABLE_TLS "Enable TLS support via OpenSSL" ON)
 find_package(Boost 1.74 REQUIRED COMPONENTS system thread)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(PostgreSQL REQUIRED)
 
 # nlohmann/json - header-only, try find_package else FetchContent
 find_package(nlohmann_json 3.10 QUIET)
@@ -26,9 +25,8 @@ if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
-# libpqxx
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
+find_path(LEVELDB_INCLUDE_DIR leveldb/db.h REQUIRED)
+find_library(LEVELDB_LIBRARY NAMES leveldb REQUIRED)
 
 # libsodium
 find_library(SODIUM_LIB sodium)
@@ -36,11 +34,16 @@ find_path(SODIUM_INCLUDE sodium.h)
 
 # Sources
 file(GLOB_RECURSE LIB_SOURCES src/*.cpp)
-list(REMOVE_ITEM LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+list(REMOVE_ITEM LIB_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/postgres_storage.cpp
+)
+file(GLOB DUPLICATE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/* (2).cpp")
+list(REMOVE_ITEM LIB_SOURCES ${DUPLICATE_SOURCES})
 
 add_library(dwn_core STATIC ${LIB_SOURCES})
-target_link_directories(dwn_core PUBLIC /opt/pqxx/lib)
-target_include_directories(dwn_core PUBLIC include ${SODIUM_INCLUDE} ${PQXX_INCLUDE_DIRS})
+target_include_directories(dwn_core PUBLIC ${LEVELDB_INCLUDE_DIR})
+target_include_directories(dwn_core PUBLIC include ${SODIUM_INCLUDE})
 target_link_libraries(dwn_core PUBLIC
     Boost::system
     Boost::thread
@@ -49,12 +52,11 @@ target_link_libraries(dwn_core PUBLIC
     nlohmann_json::nlohmann_json
     Threads::Threads
     ${SODIUM_LIB}
-    PkgConfig::PQXX
-    PostgreSQL::PostgreSQL
+    ${LEVELDB_LIBRARY}
     Threads::Threads
 )
-add_executable(mini-dwn src/main.cpp)
-target_link_libraries(mini-dwn PRIVATE dwn_core)
+add_executable(DWN src/main.cpp)
+target_link_libraries(DWN PRIVATE dwn_core)
 
 # Tests
 if(BUILD_TESTS)
@@ -68,4 +70,4 @@ if(BUILD_TESTS)
 endif()
 
 # Install
-install(TARGETS mini-dwn DESTINATION bin)
+install(TARGETS DWN DESTINATION bin)

@@ -2,7 +2,7 @@
 #include "dwn/server.hpp"
 #include "dwn/errors.hpp"
 #include "dwn/utils.hpp"
-#include "dwn/leveldb_storage.hpp"
+#include "dwn/postgres_storage.hpp"
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
@@ -111,8 +111,8 @@ void DwnServer::handle_database_snapshot(
     http::response<http::string_body>& res,
     const std::string& name){
 
-    auto* db = dynamic_cast<LevelDbStorage*>(&storage_);
-    if(!db){
+    auto* pg = dynamic_cast<PostgresStorage*>(&storage_);
+    if(!pg){
         res.result(http::status::not_implemented);
         res.set(http::field::content_type, "application/json");
         res.body() = R"({"ok":false,"error":"Postgres snapshot backend unavailable"})";
@@ -130,7 +130,7 @@ void DwnServer::handle_database_snapshot(
             std::string pushedAt =
                 body.value("pushedAt", std::string());
 
-            if(!db->put_database_snapshot(name, data, pushedAt)){
+            if(!pg->put_database_snapshot(name, data, pushedAt)){
                 res.result(http::status::internal_server_error);
                 res.set(http::field::content_type, "application/json");
                 res.body() = R"({"ok":false,"error":"snapshot write failed"})";
@@ -152,7 +152,7 @@ void DwnServer::handle_database_snapshot(
 
         if(req.method() == http::verb::get){
             std::string pushedAt;
-            auto data = db->get_database_snapshot(name, &pushedAt);
+            auto data = pg->get_database_snapshot(name, &pushedAt);
 
             if(!data){
                 res.result(http::status::not_found);

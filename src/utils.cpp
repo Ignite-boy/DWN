@@ -106,7 +106,19 @@ std::string base58_encode(const std::vector<uint8_t>& data){
 
 std::array<uint8_t,32> sha256(const std::vector<uint8_t>& data){
     std::array<uint8_t,32> out;
-    SHA256_CTX ctx; SHA256_Init(&ctx); SHA256_Update(&ctx, data.data(), data.size()); SHA256_Final(out.data(), &ctx);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) throw std::runtime_error("EVP_MD_CTX_new failed");
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) != 1 ||
+        EVP_DigestUpdate(ctx, data.data(), data.size()) != 1) {
+        EVP_MD_CTX_free(ctx);
+        throw std::runtime_error("SHA-256 digest init/update failed");
+    }
+    unsigned int len = 0;
+    if (EVP_DigestFinal_ex(ctx, out.data(), &len) != 1 || len != out.size()) {
+        EVP_MD_CTX_free(ctx);
+        throw std::runtime_error("SHA-256 digest final failed");
+    }
+    EVP_MD_CTX_free(ctx);
     return out;
 }
 std::array<uint8_t,32> sha256(const std::string& s){ return sha256(std::vector<uint8_t>(s.begin(), s.end())); }

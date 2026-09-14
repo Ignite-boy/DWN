@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mini-dwn
+    name: dwn
     env: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
@@ -12,7 +12,5 @@ services:
         value: 0.0.0.0
       - key: DWN_PORT
         value: 10000
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mini-dwn-db
-          property: connectionString
+      - key: DWN_LEVELDB_PATH
+        value: /var/lib/DWN/leveldb

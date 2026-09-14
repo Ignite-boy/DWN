@@ -15,7 +15,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U dwn"]
       interval: 5s
       retries: 10
-  mini-dwn:
+  DWN:
     build:
       context: ..
       dockerfile: docker/Dockerfile
