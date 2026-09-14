@@ -21,6 +21,7 @@ RUN rm -rf build && \
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y \
+    nginx \
     libleveldb1d \
     libboost-system1.83.0 \
     libboost-thread1.83.0 \
@@ -30,11 +31,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/build/DWN /usr/local/bin/DWN
+COPY --from=builder /app/ui /var/www/dwn-ui
+COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
 
-RUN mkdir -p /var/lib/DWN/leveldb
+RUN mkdir -p /var/lib/DWN/leveldb && \
+    rm -f /etc/nginx/sites-enabled/default
 
 ENV DWN_LEVELDB_PATH=/var/lib/DWN/leveldb
+ENV DWN_HOST=127.0.0.1
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "DWN_PORT=${PORT:-10000} DWN"]
+CMD ["sh", "-c", "DWN_PORT=10001 DWN >/tmp/dwn.log 2>&1 & sed \"s/__PORT__/${PORT:-10000}/g\" /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
