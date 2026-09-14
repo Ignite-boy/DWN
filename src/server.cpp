@@ -91,7 +91,7 @@ DwnServer::~DwnServer(){ stop(); }
 
 nlohmann::json DwnServer::health_json(){
     bool db = storage_.health_check();
-    return {{"ok", db}, {"service","DWN"}, {"storage","postgresql"}, {"database", db}};
+    return {{"ok", db}, {"service","DWN"}, {"storage","leveldb"}, {"database", db}};
 }
 nlohmann::json DwnServer::info_json(){
     return {
@@ -99,7 +99,7 @@ nlohmann::json DwnServer::info_json(){
         {"version", config_.version},
         {"protocol","DWN"},
         {"websocketSupport", true},
-        {"storage","postgresql"}
+        {"storage","leveldb"}
     };
 }
 nlohmann::json DwnServer::metrics_json(){
